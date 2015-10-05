@@ -1,47 +1,69 @@
 (function (global) {
     'use strict';
 
+    /**
+    In the ui desginer
+      1)use attribut init
+        a variable : "customService" with implementation "return customService;"
+        and call "{{ customService.enrico }}"
+      2)use methode async
+        a variable : "user" with implementation "return customService.getUserName($data.userId);"
+    */
     function customService($interpolate, $http, $log, $location, $q) {
-        return {
-            sayHello: sayHello,
-            getInput: getInput
+
+        var contextFactory = {
+          "getUserName" : {
+            //0 idle, 1 pending
+            state : 0,
+            out : { "id" : 0 }
+          }
         };
 
-        function sayHello(who) {
+        var myReturn = {
+            getUserName: getUserName,
+            userName : contextFactory.getUserName.out
+        };
+
+        init();
+
+        return myReturn;
+
+        function init() {
           try {
-            $log.log('sayHello: start');
-            return "Hello : " + who;
+            $log.log('init: start');
+            getUserName(4);
           }catch(err){
-              $log.error('sayHello: ' + err);
+              $log.error('init: ' + err);
           }
         }
 
-        function getName(userId) {
+        function getUserName(userId){
           try {
-            $log.log('getInput: start');
-            return asyncGreet(userId);
-            promise.then(function(greeting) {
-              $log.log('Success: ' + greeting);
-            }, function(reason) {
-              $log.log('Failed: ' + reason);
-            });
-          }catch(err){
-              $log.error('getInput: ' + err);
-          }
-        }
+            $log.log('getUserName: start', userId);
+            if(userId !== ""){
+              if((userId !== contextFactory.getUserName.out.id)&&(contextFactory.getUserName.state === 0)){
+                contextFactory.getUserName.state = 1;
+                $http({
+                  method: 'GET',
+                  url: "../API/identity/user/"+userId
+                }).then(function successCallback(response) {
+                    $log.log(response);
+                    contextFactory.getUserName.state = 0;
+                    contextFactory.getUserName.out = response.data;
+                    myReturn.userName = contextFactory.getUserName.out;
+                }, function errorCallback(response) {
+                    $log.error(response);
+                    contextFactory.getUserName.state = 0;
+                });
+              }
+            }else{
+              $log.error('customService.getUserName : userId is empty');
+            }
 
-        function asyncGreet(userId) {
-          // perform some asynchronous operation, resolve or reject the promise when appropriate.
-          return $q(function(resolve, reject) {
-            $http({
-              method: 'GET',
-              url: "../API/identity/user/"+userId
-            }).then(function successCallback(response) {
-                resolve('Hello, ' + response.userName + '!');
-            }, function errorCallback(response) {
-              reject('Error ' + userId + ' is not allowed ('+response+')');
-            });
-          });
+            return myReturn.userName;
+          }catch(err){
+              $log.error('getUserName: ' + err);
+          }
         }
     }
 
