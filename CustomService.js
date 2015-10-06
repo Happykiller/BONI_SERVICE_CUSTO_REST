@@ -16,12 +16,19 @@
             //0 idle, 1 pending
             state : 0,
             out : { "id" : 0 }
+          },
+          "getFormDataInput" : {
+            //0 idle, 1 pending
+            "state" : 0,
+            "processVariableName" : "",
+            "out" : ""
           }
         };
 
         var myReturn = {
             getUserName: getUserName,
-            userName : contextFactory.getUserName.out
+            userName : contextFactory.getUserName.out,
+            getFormDataInput : getFormDataInput
         };
 
         init();
@@ -34,6 +41,68 @@
             getUserName(4);
           }catch(err){
               $log.error('init: ' + err);
+          }
+        }
+
+        /**
+          1 - For int process varialble
+          import com.fasterxml.jackson.core.JsonProcessingException;
+          import com.fasterxml.jackson.databind.ObjectMapper;
+
+          Map<String,String> map = new HashMap<String,String>();
+          map.put("key1","value1");
+          map.put("key2","value2");
+
+          String mapAsJson = null;
+          try {
+          	mapAsJson = new ObjectMapper().writeValueAsString(map);
+          } catch (JsonProcessingException e) {
+          	e.printStackTrace();
+          }
+          return mapAsJson;
+          2 - For the UiDesginer
+          Create a variable with the implementation return customService.getFormDataInput('formDataInput',$data.taskId);
+        */
+        function getFormDataInput(processVariableName, taskId){
+          try {
+            $log.log('getFormDataInput: start (processVariableName:{0}, taskId:{1})', processVariableName, taskId);
+            if((processVariableName !== "")&&(taskId !== 0)){
+              if((processVariableName !== contextFactory.getFormDataInput.processVariableName)&&(contextFactory.getFormDataInput.state === 0)){
+                contextFactory.getFormDataInput.processVariableName = processVariableName;
+                contextFactory.getFormDataInput.state = 1;
+                $http({
+                  method: 'GET',
+                  url: "../API/bpm/task/"+taskId
+                }).then(function successCallback(response) {
+                    var caseId = response.data.caseId;
+                    if(!angular.isUndefined(caseId)){
+                      $http({
+                        method: 'GET',
+                        url: "../API/bpm/caseVariable/"+caseId+"/"+encodeURI(processVariableName)
+                      }).then(function successCallback(response) {
+                          contextFactory.getFormDataInput.state = 0;
+                          var responseJson = JSON.parse(response.data.value);
+                          contextFactory.getFormDataInput.out = responseJson;
+                      }, function errorCallback(response) {
+                          $log.error(response);
+                          contextFactory.getFormDataInput.state = 0;
+                      });
+                    }else{
+                      $log.error(response);
+                      contextFactory.getFormDataInput.state = 0;
+                    }
+                }, function errorCallback(response) {
+                    $log.error(response);
+                    contextFactory.getFormDataInput.state = 0;
+                });
+              }
+            }else{
+              $log.error('customService.getFormDataInput : processVariableName is empty or taskId is empty');
+            }
+
+            return contextFactory.getFormDataInput.out;
+          }catch(err){
+              $log.error('getFormDataInput: ' + err);
           }
         }
 
